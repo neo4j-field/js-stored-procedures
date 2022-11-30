@@ -17,6 +17,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.openjdk.nashorn</groupId>
+            <artifactId>nashorn-core</artifactId>
+            <version>15.0</version>
+        </dependency>
+        <dependency>
             <!-- This gives us the Procedure API our runtime code uses.
                  We have a `provided` scope on it, because when this is
                  deployed in a Neo4j Instance, the API will be provided
@@ -94,7 +99,7 @@
                      of each Neo4j instance in your deployment.
                      After a restart, the procedure is available for calling. -->
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.3</version>
+<!--                <version>3.2.3</version>-->
                 <executions>
                     <execution>
                         <phase>package</phase>

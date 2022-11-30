@@ -13,9 +13,7 @@ import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.internal.LogService;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
+
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,21 +22,15 @@ public class StartupActions extends LifecycleAdapter {
     private final GraphDatabaseAPI graphDatabaseAPI;
     private final LogService logService;
     private final Log log;
-
-    public static ScriptEngine scriptEngine;
+    public static final StoredProcedureEngine engine = new StoredProcedureEngine() ;
 
     public StartupActions(GraphDatabaseAPI graphDatabaseAPI, LogService logService) {
         this.graphDatabaseAPI = graphDatabaseAPI;
         this.logService = logService;
         this.log = logService.getUserLog(StartupActions.class);
-        loadScriptingEngine();
+        this.engine.setLog(log) ;
     }
 
-    private void loadScriptingEngine() {
-        log.debug("Loading JS Engine");
-        var sem = new ScriptEngineManager();
-        scriptEngine = sem.getEngineByName("nashorn");
-    }
 
     @Override
     public void start() {
@@ -77,22 +69,8 @@ public class StartupActions extends LifecycleAdapter {
                     break;
                 }
             }
-            try (Transaction tx = db.beginTx()) {
-                log.debug("Cleared to load Stored Proc Nodes from DB");
-                ResourceIterator<Node> procNodes = tx.findNodes(EnumJsProcLabels.JS_StoredProc);
-                List<Node> nodeList = procNodes.stream().collect(Collectors.toList());
-                procNodes.close();
-                log.debug(String.format("Loading a total of %s scripts from DB", nodeList.size()));
-                for (Node element: nodeList) {
-                    try {
-                        scriptEngine.eval(element.getProperty("script").toString());
-                    }
-                    catch (ScriptException e) {
-                        log.error("Could not load stored JS Script due to eval error. See message", e);
-                        throw new RuntimeException();
-                    }
-                }
-            }
+
+            engine.loadStoredProcedures(db);
             log.info("LEAVE - Load Stored Proc Nodes from DB into Engine");
         }
 
