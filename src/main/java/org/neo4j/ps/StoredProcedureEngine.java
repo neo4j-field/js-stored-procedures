@@ -21,6 +21,10 @@ public class StoredProcedureEngine {
     private static Map<String, ScriptEngine> dbScriptEngineMap = new HashMap<>();
     private static Map<String, Map> dbScriptStatusMap = new HashMap<>() ;
 
+    public static final String PublicName = "publicName" ;
+    public static final String FunctionName = "name" ;
+    public static final String Script = "script" ;
+
     private Log log ;
 
     public void setLog(Log log) {
@@ -36,17 +40,19 @@ public class StoredProcedureEngine {
         try (Transaction tx = db.beginTx()) {
             log.debug("Cleared to load Stored Proc Nodes from DB");
             ResourceIterator<Node> procNodes = tx.findNodes(JS_StoredProcedure);
-            Map<String, String> scriptLoad = new HashMap<>() ;
+            Map<String, Map<String, String>> scriptLoad = new HashMap<>() ;
             dbScriptStatusMap.put(dbName, scriptLoad) ;
             procNodes.stream().forEach( element ->
                     {
                         try {
-                            String name = element.getProperty("script").toString() ;
-                            String script = element.getProperty("script").toString() ;
+                            String name = element.getProperty(PublicName).toString() ;
+                            String script = element.getProperty(Script).toString() ;
                             log.debug(String.format("Loading script: %s from DB", name));
 
                             engine.eval(script);
-                            scriptLoad.put(name, "done") ;
+                            Map<String, String> data = new HashMap<>() ;
+                            data.put(FunctionName, element.getProperty(FunctionName).toString()) ;
+                            scriptLoad.put(name, data) ;
                         }
                         catch( ScriptException e) {
                             log.error("Could not load stored JS Script due to eval error. See message", e);
@@ -57,20 +63,25 @@ public class StoredProcedureEngine {
         }
     }
 
-    public ScriptEngine getEngine(GraphDatabaseService db, String procedureName) {
+    public ScriptDetails getEngine(GraphDatabaseService db, String procedureName) {
         String dbName = db.databaseName() ;
+        ScriptDetails details = new ScriptDetails() ;
         Map statusMap = dbScriptStatusMap.get(dbName) ;
         ScriptEngine engine = dbScriptEngineMap.get(dbName) ;
+        details.setEngine(engine);
         if( statusMap.get(dbName) == null ) {
             try (Transaction tx = db.beginTx()) {
                 Node n = tx.findNode(JS_StoredProcedure, "name", procedureName) ;
                 try {
-                    String name = n.getProperty("script").toString() ;
-                    String script = n.getProperty("script").toString() ;
+                    String publicName = n.getProperty(PublicName).toString() ;
+                    String script = n.getProperty(Script).toString() ;
+                    String name = n.getProperty(FunctionName).toString() ;
                     log.debug(String.format("Loading script: %s from DB", name));
 
                     engine.eval(script);
-                    statusMap.put(name, "done") ;
+                    Map<String, String> data = new HashMap<>() ;
+                    data.put(FunctionName, n.getProperty(FunctionName).toString()) ;
+                    statusMap.put(publicName, data) ;
                 }
                 catch( ScriptException e) {
                     log.error("Could not load stored JS Script due to eval error. See message", e);
@@ -79,6 +90,9 @@ public class StoredProcedureEngine {
             }
         }
 
-        return engine ;
+        Map data = (Map) statusMap.get(dbName) ;
+        details.setName(data.get(FunctionName).toString());
+        details.setPublicName(procedureName);
+        return details ;
     }
 }

@@ -3,8 +3,11 @@ package org.neo4j.ps;
 import org.neo4j.graphdb.*;
 import org.neo4j.logging.Log;
 import org.neo4j.procedure.*;
+//import org.openjdk.nashorn.api.tree.CompilationUnitTree;
+//import org.openjdk.nashorn.api.tree.Parser;
 
 import javax.script.Invocable;
+import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 import java.util.*;
 import java.util.stream.Stream;
@@ -18,6 +21,8 @@ public class StoredProcedureAPI {
     @Context
     public GraphDatabaseService db;
 
+    private static final ScriptEngineManager scriptFactory = new ScriptEngineManager() ;
+
     /**
      *
      * @param jsFunc
@@ -28,11 +33,11 @@ public class StoredProcedureAPI {
      */
     @Procedure(name = "js.storedproc.register", mode = Mode.WRITE)
     @Description("js.storedproc.register(<Valid Javascript Function Code>, <Public Name>, <Required Java Classes>) - Save a Javascript Stored Procedure")
-    public Stream<Output> addNewJsFunction(@Name(value = "funcCode") String jsFunc,
-                                     @Name(value = "pubName" , defaultValue = "") String publicName,
+    public Stream<Output> addNewJsFunction(@Name(value = "script") String script,
+                                     @Name(value = "publicName" , defaultValue = "") String publicName,
                                      @Name(value = "reqClasses", defaultValue = "") String reqClasses) throws RuntimeException {
 
-        if (validateUniqueJsFunctionName(publicName, publicName)) {
+        if (validate(publicName, script)) {
             // Only after successful script + Java Class List validation we can proceed to record nodes
 //            try (Transaction tx = db.beginTx()) {
 //                StartupActions.scriptEngine.eval(jsFunc);
@@ -67,7 +72,7 @@ public class StoredProcedureAPI {
     @Description("js.procedure.invoke(<String procPublicName)>, {Proc Params}")
     public Stream<MapResult> invokeStoredProcedure(@Name("procedureName") String procedureName,
                                                @Name(value = "parameters") Map parameters) {
-        var scriptEngine = StartupActions.engine.getEngine(db, procedureName);
+        var details = StartupActions.engine.getEngine(db, procedureName);
         if( parameters == null ) {
             parameters = new HashMap() ;
         }
@@ -76,8 +81,8 @@ public class StoredProcedureAPI {
 
         try {
 
-            Invocable invocable = (Invocable) scriptEngine;
-            invocable.invokeFunction(procedureName, parameters) ;
+            Invocable invocable = (Invocable) details.getEngine();
+            Object response = invocable.invokeFunction(details.getName(), parameters) ;
 
         } catch (Exception e) {
             log.error("Something went wrong", e);
@@ -93,24 +98,19 @@ public class StoredProcedureAPI {
         }
     }
 
-    private boolean validateUniqueJsFunctionName(String proposedName, String autoName) {
-        // TODO - Implement Unique JS Function Name Validation
-        return true;
-//        long found;
-//        Map<String, Object> namesMap = new HashMap<>();
-//
-//        if (!proposedName.equals("")) {
-//            namesMap.put("publicName", proposedName);
-//        }
-//        else {
-//            namesMap.put("name", autoName);
-//        }
-//        try (Transaction tx = db.beginTx()) {
-//            found = tx.findNodes(EnumJsProcLabels.JS_StoredProc, namesMap)
-//                    .stream()
-//                    .findFirst()
-//                    .stream().count();
-//        }
-//        return found <= 0;
+    private boolean validate(String publicName, String script) {
+//        Parser parser = Parser.create();
+//        CompilationUnitTree cut = parser.parse(publicName, script, (d) -> { System.out.println(d); }) ;
+
+        try (Transaction tx= db.beginTx()) {
+            Node n = tx.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName) ;
+            if( n != null ) {
+                // We already have a function with this public name.
+                // We need to make sure the script function name is the same as we
+                // have received.
+            }
+            tx.commit();
+        }
+        return true ;
     }
 }
