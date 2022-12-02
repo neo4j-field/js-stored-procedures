@@ -1,14 +1,15 @@
 package org.neo4j.ps;
 
+import jdk.nashorn.api.tree.CompilationUnitTree;
+import jdk.nashorn.api.tree.FunctionDeclarationTree;
+import jdk.nashorn.api.tree.Parser;
 import org.neo4j.graphdb.*;
 import org.neo4j.logging.Log;
 import org.neo4j.procedure.*;
-//import org.openjdk.nashorn.api.tree.CompilationUnitTree;
-//import org.openjdk.nashorn.api.tree.Parser;
+
 
 import javax.script.Invocable;
 import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -25,35 +26,46 @@ public class StoredProcedureAPI {
 
     /**
      *
-     * @param jsFunc
+     * @param script
      * @param publicName
      * @param reqClasses
      * @return
      * @throws RuntimeException
      */
-    @Procedure(name = "js.storedproc.register", mode = Mode.WRITE)
-    @Description("js.storedproc.register(<Valid Javascript Function Code>, <Public Name>, <Required Java Classes>) - Save a Javascript Stored Procedure")
-    public Stream<Output> addNewJsFunction(@Name(value = "script") String script,
+    @Procedure(name = "js.procedure.register", mode = Mode.WRITE)
+    @Description("js.addNewJsProcedure.register(<Valid Javascript Function Code>, <Public Name>, <Required Java Classes>) - Save a Javascript Stored Procedure")
+    public Stream<RegisterResult> addNewJsProcedure(@Name(value = "script") String script,
                                      @Name(value = "publicName" , defaultValue = "") String publicName,
                                      @Name(value = "reqClasses", defaultValue = "") String reqClasses) throws RuntimeException {
 
-        if (validate(publicName, script)) {
-            // Only after successful script + Java Class List validation we can proceed to record nodes
-//            try (Transaction tx = db.beginTx()) {
-//                StartupActions.scriptEngine.eval(jsFunc);
-//                Node newProcNode = tx.createNode(EnumJsProcLabels.JS_StoredProc);
-//                newProcNode.setProperty("script", jsFunc);
-//                newProcNode.setProperty("publicName", publicName);
-//                newProcNode.setProperty("name", publicName);
-//                tx.commit();
-//                log.info("Saved Node with JS Function info in DB");
-//            }
-//            catch (ScriptException e) {
-//                // TODO - Do we want to throw a Runtime exception or return a non-standard error message?
-//                log.error("Failed to register script", e);
-//                throw new RuntimeException();
-//            }
-            return Stream.of(new Output("Done"));
+        Parser parser = Parser.create();
+        String compilationMessage = "" ;
+        JSParserDiagnosticListener listener = new JSParserDiagnosticListener() ;
+        CompilationUnitTree cut = parser.parse(publicName, script, listener) ;
+
+        if( listener.hasError() ) {
+            // There is some parse error.
+            return Stream.of(new RegisterResult(listener.getMessage()));
+        }
+
+        if( cut.getSourceElements().size() > 1 ) {
+            // Error
+            return Stream.of(new RegisterResult("There can be only on JS function per register request."));
+        }
+
+        String name = ((FunctionDeclarationTree)(cut.getSourceElements().get(0))).getName().getName() ;
+
+        if (validate(publicName, name)) {
+            Node n = txn.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName);
+            if( n == null ) {
+                n = txn.createNode(StoredProcedureEngine.JS_StoredProcedure) ;
+                n.setProperty(StoredProcedureEngine.PublicName, publicName);
+                n.setProperty(StoredProcedureEngine.FunctionName, name);
+                n.setProperty(StoredProcedureEngine.Script, script);
+            } else {
+                n.setProperty(StoredProcedureEngine.Script, script);
+            }
+            return Stream.of(RegisterResult.SUCCESS);
         }
         else {
             throw new RuntimeException("Proc Name not unique");
@@ -98,18 +110,18 @@ public class StoredProcedureAPI {
         }
     }
 
-    private boolean validate(String publicName, String script) {
-//        Parser parser = Parser.create();
-//        CompilationUnitTree cut = parser.parse(publicName, script, (d) -> { System.out.println(d); }) ;
-
-        try (Transaction tx= db.beginTx()) {
-            Node n = tx.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName) ;
-            if( n != null ) {
+    private boolean validate(String publicName, String name) {
+        ValidationStatusCode status = StartupActions.engine.validateFunction(db.databaseName(), publicName, name) ;
+        if( status == ValidationStatusCode.NAME_MISSING || status == ValidationStatusCode.PUBLIC_NAME_MISSING ) {
+            Node n = txn.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName);
+            if (n != null) {
                 // We already have a function with this public name.
-                // We need to make sure the script function name is the same as we
-                // have received.
+                if( status == ValidationStatusCode.NAME_MISSING ) {
+                    // Since we couldn't find the name, but found the public name
+                    // There is a mismatch.
+                    return false;
+                }
             }
-            tx.commit();
         }
         return true ;
     }
