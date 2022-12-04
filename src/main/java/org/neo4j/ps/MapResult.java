@@ -2,20 +2,20 @@ package org.neo4j.ps;
 
 import org.neo4j.graphdb.Path;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class MapResult {
-  public Map map;
+  public final static MapResult EMPTY = new MapResult(new HashMap()) ;
 
-  public MapResult(Map path) {
-    this.map = path;
+  public final Map<String, Object> map;
+
+  public MapResult(Map map) {
+    this.map = map;
   }
 
   public Map getMap() {
     return map;
   }
 
-  public void setMap(Map map) {
-    this.map = map;
-  }
 }

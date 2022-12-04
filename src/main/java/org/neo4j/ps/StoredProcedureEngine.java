@@ -28,14 +28,32 @@ public class StoredProcedureEngine {
 
     private Log log ;
 
+    private static StoredProcedureEngine thisEngine ;
+
+    public static synchronized StoredProcedureEngine getStoredProcedureEngine(Log log) {
+        if( thisEngine == null ) {
+            thisEngine = new StoredProcedureEngine(log) ;
+        }
+        return thisEngine ;
+    }
+
     public void setLog(Log log) {
         this.log = log;
     }
 
+    private StoredProcedureEngine(Log log) {
+        if( log != null ) {
+            this.log = log;
+            log.info("Stored Prcedure Engine Constuctor called");
+        }
+    }
+
     public void loadStoredProcedures(GraphDatabaseAPI db) {
         String dbName = db.databaseName() ;
-        ScriptEngine engine = scriptFactory.getEngineByName("nashhorn") ;
+        ScriptEngine engine = scriptFactory.getEngineByName("nashorn");
 
+        log.info("Loading Stored procedures for Database : " + dbName);
+        log.info("This class : " + this );
         dbScriptEngineMap.put(dbName, engine) ;
 
         try (Transaction tx = db.beginTx()) {
@@ -70,34 +88,34 @@ public class StoredProcedureEngine {
         }
     }
 
-    public ScriptDetails getEngine(GraphDatabaseService db, String procedureName) {
+    public ScriptDetails getEngine(GraphDatabaseService db, Transaction tx, String procedureName) {
         String dbName = db.databaseName() ;
         ScriptDetails details = new ScriptDetails() ;
         Map publicNameMap = dbScriptPublicNameMap.get(dbName) ;
-        Map nameMap = dbScriptNameMap.get(dbName) ;
+//        Map nameMap = dbScriptNameMap.get(dbName) ;
 
         ScriptEngine engine = dbScriptEngineMap.get(dbName) ;
         details.setEngine(engine);
-        if( publicNameMap.get(dbName) == null ) {
-            loadProcedure(db, procedureName);
+        if( publicNameMap.get(procedureName) == null ) {
+            loadProcedure(db, tx, procedureName);
         }
 
-        Map data = (Map) publicNameMap.get(dbName) ;
+        Map data = (Map) publicNameMap.get(procedureName) ;
         details.setName(data.get(FunctionName).toString());
         details.setPublicName(procedureName);
         return details ;
     }
 
     public ValidationStatusCode validateFunction(String dbName, String publicName, String name) {
-        Map publicNameMap = dbScriptPublicNameMap.get(dbName) ;
-        Map nameMap = dbScriptNameMap.get(dbName) ;
+        Map<String, String> publicNameMap = dbScriptPublicNameMap.get(dbName) ;
+        Map<String, String> nameMap = dbScriptNameMap.get(dbName) ;
 
         if( publicNameMap == null || nameMap == null ) {
             return ValidationStatusCode.NO_DATABASE_MATCH ;
         }
 
-        String savedPublicName = nameMap.get(name).toString() ;
-        String savedName = publicNameMap.get(publicName).toString() ;
+        String savedPublicName = nameMap.get(name);
+        String savedName = publicNameMap.get(publicName) ;
 
         if( savedPublicName == null ) {
             return ValidationStatusCode.PUBLIC_NAME_MISSING ;
@@ -114,32 +132,31 @@ public class StoredProcedureEngine {
         return ValidationStatusCode.SUCCESS ;
     }
 
-    public void loadProcedure(GraphDatabaseService db, String publicName) {
+    public void loadProcedure(GraphDatabaseService db, Transaction tx,String publicName) {
+        log.info("This class : " + this );
         String dbName = db.databaseName() ;
         ScriptEngine engine = dbScriptEngineMap.get(dbName) ;
         Map publicNameMap = dbScriptPublicNameMap.get(dbName) ;
         Map nameMap = dbScriptNameMap.get(dbName) ;
 
-        try (Transaction tx = db.beginTx()) {
-            Node n = tx.findNode(JS_StoredProcedure, PublicName, publicName) ;
-            try {
-                String pubName = n.getProperty(PublicName).toString() ;
-                String script = n.getProperty(Script).toString() ;
-                String name = n.getProperty(FunctionName).toString() ;
-                log.debug(String.format("Loading script: %s from DB", name));
+        Node n = tx.findNode(JS_StoredProcedure, PublicName, publicName) ;
+        try {
+            String pubName = n.getProperty(PublicName).toString() ;
+            String script = n.getProperty(Script).toString() ;
+            String name = n.getProperty(FunctionName).toString() ;
+            log.debug(String.format("Loading script: %s from DB", name));
 
-                engine.eval(script);
-                Map<String, String> data = new HashMap<>() ;
-                data.put(FunctionName, name) ;
-                data.put(PublicName, pubName );
-                publicNameMap.put(pubName, data) ;
-                nameMap.put(name, data) ;
-                tx.commit();
-            }
-            catch( ScriptException e) {
-                log.error("Could not load stored JS Script due to eval error. See message", e);
-                //throw new RuntimeException();
-            }
+            engine.eval(script);
+            Map<String, String> data = new HashMap<>() ;
+            data.put(FunctionName, name) ;
+            data.put(PublicName, pubName );
+            publicNameMap.put(pubName, data) ;
+            nameMap.put(name, data) ;
+        }
+        catch( ScriptException e) {
+            log.error("Could not load stored JS Script due to eval error. See message", e);
+            //throw new RuntimeException();
         }
     }
+
 }

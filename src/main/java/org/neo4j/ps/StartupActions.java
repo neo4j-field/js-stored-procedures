@@ -22,13 +22,12 @@ public class StartupActions extends LifecycleAdapter {
     private final GraphDatabaseAPI graphDatabaseAPI;
     private final LogService logService;
     private final Log log;
-    public static final StoredProcedureEngine engine = new StoredProcedureEngine() ;
 
     public StartupActions(GraphDatabaseAPI graphDatabaseAPI, LogService logService) {
         this.graphDatabaseAPI = graphDatabaseAPI;
         this.logService = logService;
         this.log = logService.getUserLog(StartupActions.class);
-        this.engine.setLog(log) ;
+        StoredProcedureEngine.getStoredProcedureEngine(log) ;
     }
 
 
@@ -70,6 +69,7 @@ public class StartupActions extends LifecycleAdapter {
                 }
             }
 
+            StoredProcedureEngine engine = StoredProcedureEngine.getStoredProcedureEngine(null) ;
             engine.loadStoredProcedures(db);
             log.info("LEAVE - Load Stored Proc Nodes from DB into Engine");
         }

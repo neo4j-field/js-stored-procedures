@@ -33,7 +33,7 @@ public class StoredProcedureAPI {
      * @throws RuntimeException
      */
     @Procedure(name = "js.procedure.register", mode = Mode.WRITE)
-    @Description("js.addNewJsProcedure.register(<Valid Javascript Function Code>, <Public Name>, <Required Java Classes>) - Save a Javascript Stored Procedure")
+    @Description("js.procedure.register(<Valid Javascript Function Code>, <Public Name>, <Required Java Classes>) - Save a Javascript Stored Procedure")
     public Stream<RegisterResult> addNewJsProcedure(@Name(value = "script") String script,
                                      @Name(value = "publicName" , defaultValue = "") String publicName,
                                      @Name(value = "reqClasses", defaultValue = "") String reqClasses) throws RuntimeException {
@@ -62,6 +62,7 @@ public class StoredProcedureAPI {
                 n.setProperty(StoredProcedureEngine.PublicName, publicName);
                 n.setProperty(StoredProcedureEngine.FunctionName, name);
                 n.setProperty(StoredProcedureEngine.Script, script);
+                StoredProcedureEngine.getStoredProcedureEngine(null).loadProcedure(db, txn, publicName);
             } else {
                 n.setProperty(StoredProcedureEngine.Script, script);
             }
@@ -80,14 +81,17 @@ public class StoredProcedureAPI {
      * @param parameters
      * @return
      */
-    @Procedure(name = "js.procedure.invoke", mode = Mode.READ)
+    @Procedure(name = "js.procedure.invoke", mode = Mode.WRITE)
     @Description("js.procedure.invoke(<String procPublicName)>, {Proc Params}")
     public Stream<MapResult> invokeStoredProcedure(@Name("procedureName") String procedureName,
                                                @Name(value = "parameters") Map parameters) {
-        var details = StartupActions.engine.getEngine(db, procedureName);
+        Map<String, Object> result = new HashMap<>() ;
+
+        var details = StoredProcedureEngine.getStoredProcedureEngine(null).getEngine(db, txn, procedureName);
         if( parameters == null ) {
             parameters = new HashMap() ;
         }
+
         parameters.put("txn", txn);
         parameters.put("log", log);
 
@@ -96,11 +100,14 @@ public class StoredProcedureAPI {
             Invocable invocable = (Invocable) details.getEngine();
             Object response = invocable.invokeFunction(details.getName(), parameters) ;
 
+            result.put("result", response) ;
+
         } catch (Exception e) {
             log.error("Something went wrong", e);
-            throw new RuntimeException(e);
+            result.put("error", e.getMessage()) ;
+            //throw new RuntimeException(e);
         }
-        return null;
+        return Stream.of(new MapResult(result));
     }
 
     public static class Output {
@@ -111,7 +118,7 @@ public class StoredProcedureAPI {
     }
 
     private boolean validate(String publicName, String name) {
-        ValidationStatusCode status = StartupActions.engine.validateFunction(db.databaseName(), publicName, name) ;
+        ValidationStatusCode status = StoredProcedureEngine.getStoredProcedureEngine(null).validateFunction(db.databaseName(), publicName, name) ;
         if( status == ValidationStatusCode.NAME_MISSING || status == ValidationStatusCode.PUBLIC_NAME_MISSING ) {
             Node n = txn.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName);
             if (n != null) {
