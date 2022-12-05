@@ -19,8 +19,8 @@ public class StoredProcedureEngine {
 
     private static  final ScriptEngineManager scriptFactory = new ScriptEngineManager() ;
     private static Map<String, ScriptEngine> dbScriptEngineMap = new HashMap<>();
-    private static Map<String, Map> dbScriptPublicNameMap = new HashMap<>() ;
-    private static Map<String, Map> dbScriptNameMap = new HashMap<>() ;
+    private static Map<String, Map<String, Map<String, String>>> dbScriptPublicNameMap = new HashMap<>() ;
+    private static Map<String, Map<String, Map<String, String>>> dbScriptNameMap = new HashMap<>() ;
 
     public static final String PublicName = "publicName" ;
     public static final String FunctionName = "name" ;
@@ -91,7 +91,7 @@ public class StoredProcedureEngine {
     public ScriptDetails getEngine(GraphDatabaseService db, Transaction tx, String procedureName) {
         String dbName = db.databaseName() ;
         ScriptDetails details = new ScriptDetails() ;
-        Map publicNameMap = dbScriptPublicNameMap.get(dbName) ;
+        Map<String, Map<String, String>> publicNameMap = dbScriptPublicNameMap.get(dbName) ;
 //        Map nameMap = dbScriptNameMap.get(dbName) ;
 
         ScriptEngine engine = dbScriptEngineMap.get(dbName) ;
@@ -100,32 +100,35 @@ public class StoredProcedureEngine {
             loadProcedure(db, tx, procedureName);
         }
 
-        Map data = (Map) publicNameMap.get(procedureName) ;
+        Map<String, String> data = publicNameMap.get(procedureName) ;
         details.setName(data.get(FunctionName).toString());
         details.setPublicName(procedureName);
         return details ;
     }
 
     public ValidationStatusCode validateFunction(String dbName, String publicName, String name) {
-        Map<String, String> publicNameMap = dbScriptPublicNameMap.get(dbName) ;
-        Map<String, String> nameMap = dbScriptNameMap.get(dbName) ;
+        Map<String, Map<String, String>> publicNameMap = dbScriptPublicNameMap.get(dbName) ;
+        Map<String, Map<String, String>> nameMap = dbScriptNameMap.get(dbName) ;
 
         if( publicNameMap == null || nameMap == null ) {
             return ValidationStatusCode.NO_DATABASE_MATCH ;
         }
 
-        String savedPublicName = nameMap.get(name);
-        String savedName = publicNameMap.get(publicName) ;
+        Map<String, String> savedPublicNameMap = nameMap.get(name);
+        Map<String, String> savedNameMap = publicNameMap.get(publicName) ;
 
-        if( savedPublicName == null ) {
+        if( savedPublicNameMap == null ) {
             return ValidationStatusCode.PUBLIC_NAME_MISSING ;
         }
 
-        if( savedName == null ) {
+        if( savedNameMap == null ) {
             return ValidationStatusCode.NAME_MISSING ;
         }
 
-        if(!( savedName.equals(name) && savedPublicName.equals(publicName) ) ) {
+        String savedName = savedPublicNameMap.get(FunctionName) ;
+        String savedPublicName = savedNameMap.get(PublicName) ;
+
+        if( !( savedName.equals(name) && savedPublicName.equals(publicName) ) ) {
             return ValidationStatusCode.NAMES_MISMATCH ;
         }
 
