@@ -64,10 +64,10 @@ public class StoredProcedureAPI {
                 n.setProperty(StoredProcedureEngine.PublicName, publicName);
                 n.setProperty(StoredProcedureEngine.FunctionName, name);
                 n.setProperty(StoredProcedureEngine.Script, script);
-                StoredProcedureEngine.getStoredProcedureEngine(null).loadProcedure(db, txn, publicName);
             } else {
                 n.setProperty(StoredProcedureEngine.Script, script);
             }
+            StoredProcedureEngine.getStoredProcedureEngine(null).loadProcedure(db, txn, publicName);
             return Stream.of(RegisterResult.SUCCESS);
         } else {
             throw new RuntimeException("Proc Name not unique");
