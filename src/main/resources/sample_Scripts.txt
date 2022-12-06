@@ -1,0 +1,2 @@
+call js.procedure.register("function nodeCount(params) { var log = params['log'] ; var txn = params['txn'] ; log.info('Testing log') ;  return txn.getAllNodes().stream().count() }", "nodecount", "")
+call js.procedure.invoke("nodecount", {})

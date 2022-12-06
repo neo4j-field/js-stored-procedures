@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 
 public class StoredProcedureEngine {
     public static Label JS_StoredProcedure = Label.label("JS_StoredProcedure") ;
+    public static Label JS_RequiredClasses = Label.label("JS_RequiredClasses") ;
 
     private static  final ScriptEngineManager scriptFactory = new ScriptEngineManager() ;
     private static Map<String, ScriptEngine> dbScriptEngineMap = new HashMap<>();
@@ -25,6 +26,25 @@ public class StoredProcedureEngine {
     public static final String PublicName = "publicName" ;
     public static final String FunctionName = "name" ;
     public static final String Script = "script" ;
+
+    public static final String BasicDBClasses = "basicDBClasses" ;
+    public static final String OtherClasses = "otherClasses" ;
+
+    private static final String DBBasicClasses = "" +
+            "var Direction = Java.type(\"org.neo4j.graphdb.Direction\")\n" +
+            "var Label = Java.type(\"org.neo4j.graphdb.Label\")\n" +
+            "var PathBuilder = Java.type(\"org.neo4j.graphalgo.impl.util.PathImpl.Builder\")\n" +
+            "var RelationshipType = Java.type(\"org.neo4j.graphdb.RelationshipType\")\n" +
+            "var Node  = Java.type(\"org.neo4j.graphdb.Node\")\n" +
+            "var ResourceIterator  = Java.type(\"org.neo4j.graphdb.ResourceIterator\")\n" +
+            "var Relationship  = Java.type(\"org.neo4j.graphdb.Relationship\")\n" +
+            "var Path  = Java.type(\"org.neo4j.graphdb.Path\")\n" +
+            "var GraphDatabaseService  = Java.type(\"org.neo4j.graphdb.GraphDatabaseService\")\n" +
+            "var Transaction  = Java.type(\"org.neo4j.graphdb.Transaction\")" ;
+
+    private static final String OtherRequiredClasses = "" +
+            "var ArrayList = Java.type(\"java.util.ArrayList\")\n" +
+            "var HashMap = Java.type(\"java.util.HashMap\")" ;
 
     private Log log ;
 
@@ -58,7 +78,37 @@ public class StoredProcedureEngine {
 
         try (Transaction tx = db.beginTx()) {
             log.debug("Cleared to load Stored Proc Nodes from DB");
+
+
+
+            ResourceIterator<Node> requiredClasses  = tx.findNodes(JS_RequiredClasses) ;
+            if( requiredClasses.hasNext()) {
+                try {
+                    Node n = requiredClasses.next();
+                    log.debug("Loading Basic Database classes");
+                    String classText = null;
+                    if (n.hasProperty(BasicDBClasses)) {
+                        classText = n.getProperty(BasicDBClasses).toString();
+                    } else {
+                        classText = DBBasicClasses;
+                    }
+                    engine.eval(classText);
+                    log.debug("Loading Other Required classes");
+                    if (n.hasProperty(OtherClasses)) {
+                        classText = n.getProperty(OtherClasses).toString();
+                    } else {
+                        classText = OtherRequiredClasses;
+                    }
+                    engine.eval(classText);
+                }catch( ScriptException e) {
+                    log.error("Could not load stored JS Script due to eval error. See message", e);
+                    //throw new RuntimeException();
+                }
+                log.debug("Loaded required class definitions.");
+            }
+
             ResourceIterator<Node> procNodes = tx.findNodes(JS_StoredProcedure);
+
             Map<String, Map<String, String>> publicNameMap = new HashMap<>() ;
             Map<String, Map<String, String>> nameMap = new HashMap<>() ;
             dbScriptPublicNameMap.put(dbName, publicNameMap) ;
