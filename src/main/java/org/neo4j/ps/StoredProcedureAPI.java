@@ -48,12 +48,14 @@ public class StoredProcedureAPI {
             return Stream.of(new RegisterResult(listener.getMessage()));
         }
 
-        if( cut.getSourceElements().size() > 1 ) {
+        if( cut.getSourceElements().size() != 1 || !(cut.getSourceElements().get(0) instanceof FunctionDeclarationTree)) {
             // Error
-            return Stream.of(new RegisterResult("There can be only on JS function per register request."));
+            return Stream.of(new RegisterResult("There must exist exactly one JS function per register request."));
+        } else if (((FunctionDeclarationTree)(cut.getSourceElements().get(0))).getParameters().size() != 1) {
+            // Error
+            return Stream.of(new RegisterResult("There must be exactly one parameter in JS function."));
         }
-
-        String name = ((FunctionDeclarationTree)(cut.getSourceElements().get(0))).getName().getName() ;
+        String name = ((FunctionDeclarationTree)(cut.getSourceElements().get(0))).getName().getName();
 
         if (validate(publicName, name)) {
             Node n = txn.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName);
@@ -62,18 +64,15 @@ public class StoredProcedureAPI {
                 n.setProperty(StoredProcedureEngine.PublicName, publicName);
                 n.setProperty(StoredProcedureEngine.FunctionName, name);
                 n.setProperty(StoredProcedureEngine.Script, script);
-                StoredProcedureEngine.getStoredProcedureEngine(null).loadProcedure(db, txn, publicName);
             } else {
                 n.setProperty(StoredProcedureEngine.Script, script);
             }
+            StoredProcedureEngine.getStoredProcedureEngine(null).loadProcedure(db, txn, publicName);
             return Stream.of(RegisterResult.SUCCESS);
-        }
-        else {
+        } else {
             throw new RuntimeException("Proc Name not unique");
         }
     }
-
-
 
     /**
      *
@@ -87,34 +86,29 @@ public class StoredProcedureAPI {
                                                @Name(value = "parameters") Map parameters) {
         Map<String, Object> result = new HashMap<>() ;
 
-        var details = StoredProcedureEngine.getStoredProcedureEngine(null).getEngine(db, txn, procedureName);
-        if( parameters == null ) {
-            parameters = new HashMap() ;
-        }
+        ScriptDetails details = StoredProcedureEngine.getStoredProcedureEngine(null).getEngine(db, txn, procedureName);
 
-        parameters.put("txn", txn);
-        parameters.put("log", log);
+        if (details == null) {
+            result.put("error", "Procedure doesn't exist or cannot be loaded into ScriptEngine") ;
+        } else {
+            if(parameters == null) {
+                parameters = new HashMap() ;
+            }
+            parameters.put("txn", txn);
+            parameters.put("log", log);
 
-        try {
+            try {
+                Invocable invocable = (Invocable) details.getEngine();
+                Object response = invocable.invokeFunction(details.getName(), parameters) ;
 
-            Invocable invocable = (Invocable) details.getEngine();
-            Object response = invocable.invokeFunction(details.getName(), parameters) ;
-
-            result.put("result", response) ;
-
-        } catch (Exception e) {
-            log.error("Something went wrong", e);
-            result.put("error", e.getMessage()) ;
-            //throw new RuntimeException(e);
+                result.put("result", response) ;
+            } catch (Exception e) {
+                log.error("Something went wrong", e);
+                result.put("error", e.getMessage()) ;
+                //throw new RuntimeException(e);
+            }
         }
         return Stream.of(new MapResult(result));
-    }
-
-    public static class Output {
-        public String out;
-        Output(String out) {
-            this.out = out;
-        }
     }
 
     private boolean validate(String publicName, String name) {
