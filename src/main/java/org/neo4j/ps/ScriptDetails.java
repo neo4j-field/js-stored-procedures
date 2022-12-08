@@ -3,9 +3,10 @@ package org.neo4j.ps;
 import javax.script.ScriptEngine;
 
 public class ScriptDetails {
-    private ScriptEngine engine ;
-    private String publicName ;
-    private String name ;
+
+    private ScriptEngine engine;
+    private String publicName;
+    private String name;
 
     public ScriptEngine getEngine() {
         return engine;

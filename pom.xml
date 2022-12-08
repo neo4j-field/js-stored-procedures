@@ -16,11 +16,6 @@
 
 
     <dependencies>
-<!--        <dependency>-->
-<!--            <groupId>org.openjdk.nashorn</groupId>-->
-<!--            <artifactId>nashorn-core</artifactId>-->
-<!--            <version>15.0</version>-->
-<!--        </dependency>-->
         <dependency>
             <!-- This gives us the Procedure API our runtime code uses.
                  We have a `provided` scope on it, because when this is
@@ -32,53 +27,6 @@
             <version>${neo4j.version}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- This gives us compile-time sanity checks on the procedure(s)
-          this project includes.
-          It is marked `optional` because it concerns only the current
-          project compilation and should not be fetched if this project
-          is used as a dependency. -->
-        <dependency>
-            <groupId>org.neo4j</groupId>
-            <artifactId>neo4j-kernel</artifactId>
-            <version>${neo4j.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.neo4j</groupId>
-            <artifactId>neo4j-enterprise</artifactId>
-            <version>3.4.18</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.neo4j</groupId>
-            <artifactId>neo4j-logging</artifactId>
-            <version>${neo4j.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.neo4j</groupId>
-            <artifactId>neo4j-kernel</artifactId>
-            <type>test-jar</type>
-            <version>${neo4j.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!--
-        <dependency>
-            <groupId>org.mozilla</groupId>
-            <artifactId>rhino</artifactId>
-            <version>1.7.14</version>
-        </dependency>
-        <dependency>
-            <groupId>org.mozilla</groupId>
-            <artifactId>rhino-engine</artifactId>
-            <version>1.7.14</version>
-        </dependency>
-        <dependency>
-            <groupId>org.mozilla</groupId>
-            <artifactId>rhino-runtime</artifactId>
-            <version>1.7.14</version>
-        </dependency>
-        -->
     </dependencies>
 
     <build>
