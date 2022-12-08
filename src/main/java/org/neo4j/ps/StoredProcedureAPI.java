@@ -61,7 +61,7 @@ public class StoredProcedureAPI {
         if (validate(publicName, name)) {
             Node n = txn.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName);
             if(n == null) {
-                n = txn.createNode(StoredProcedureEngine.JS_StoredProcedure) ;
+                n = txn.createNode(StoredProcedureEngine.JS_StoredProcedure);
                 n.setProperty(StoredProcedureEngine.PublicName, publicName);
                 n.setProperty(StoredProcedureEngine.FunctionName, name);
                 n.setProperty(StoredProcedureEngine.Script, script);
@@ -88,7 +88,7 @@ public class StoredProcedureAPI {
         ScriptDetails details = StoredProcedureEngine.getStoredProcedureEngine(null).getEngine(db, txn, procedureName);
 
         if (details == null) {
-            result.put("error", "Procedure doesn't exist or cannot be loaded into ScriptEngine") ;
+            result.put("error", "Procedure doesn't exist or cannot be loaded into ScriptEngine.") ;
         } else {
             if(parameters == null) {
                 parameters = new HashMap() ;
