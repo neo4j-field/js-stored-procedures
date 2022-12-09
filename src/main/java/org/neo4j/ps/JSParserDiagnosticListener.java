@@ -1,7 +1,7 @@
 package org.neo4j.ps;
 
-import jdk.nashorn.api.tree.Diagnostic;
-import jdk.nashorn.api.tree.DiagnosticListener;
+import org.openjdk.nashorn.api.tree.Diagnostic;
+import org.openjdk.nashorn.api.tree.DiagnosticListener;
 
 public class JSParserDiagnosticListener implements DiagnosticListener {
 

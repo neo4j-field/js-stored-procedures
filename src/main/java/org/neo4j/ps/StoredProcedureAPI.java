@@ -1,8 +1,8 @@
 package org.neo4j.ps;
 
-import jdk.nashorn.api.tree.CompilationUnitTree;
-import jdk.nashorn.api.tree.FunctionDeclarationTree;
-import jdk.nashorn.api.tree.Parser;
+import org.openjdk.nashorn.api.tree.CompilationUnitTree;
+import org.openjdk.nashorn.api.tree.FunctionDeclarationTree;
+import org.openjdk.nashorn.api.tree.Parser;
 import org.neo4j.graphdb.*;
 import org.neo4j.logging.Log;
 import org.neo4j.procedure.*;

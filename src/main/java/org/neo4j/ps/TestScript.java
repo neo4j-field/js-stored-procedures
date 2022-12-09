@@ -1,7 +1,7 @@
 package org.neo4j.ps;
 
 
-import jdk.nashorn.api.tree.*;
+import org.openjdk.nashorn.api.tree.*;
 
 public class TestScript {
     public static void main(String[] args) {
