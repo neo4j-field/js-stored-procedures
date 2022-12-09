@@ -37,6 +37,16 @@ public class StoredProcedureAPITests {
         this.embeddedDatabaseServer.close();
     }
 
+    private void test(String cypher, Map<String, Object> params, String returnKey, Object expected, String message) {
+        try(Session session = driver.session()) {
+            Result result = session.run(cypher, params);
+            Object actual = (expected instanceof String) ? result.single().get(returnKey).asString()
+                    : (expected instanceof Map) ? result.single().get(returnKey).asMap()
+                    : result.single().get(returnKey);
+            Assertions.assertEquals(expected, actual, message);
+        }
+    }
+
     @Test
     @Order(0)
     public void testRegisterProcedureGlobalStatementOnly() {
@@ -46,12 +56,7 @@ public class StoredProcedureAPITests {
         Map<String, Object> params = new HashMap<>();
         params.put("script", script);
         params.put("name", "test");
-        try(Session session = driver.session()) {
-            Result result = session.run(REGISTER_CALL, params);
-            Assertions.assertEquals("There must exist exactly one JS function per register request.",
-                    result.single().get("message").asString(),
-                    "Only global statement must result in error message");
-        }
+        test(REGISTER_CALL, params, "message", "There must exist exactly one JS function per register request.", "Only global statement must result in error message");
     }
 
     @Test
@@ -68,12 +73,7 @@ public class StoredProcedureAPITests {
         Map<String, Object> params = new HashMap<>();
         params.put("script", script);
         params.put("name", "test");
-        try(Session session = driver.session()) {
-            Result result = session.run(REGISTER_CALL, params);
-            Assertions.assertEquals("There must exist exactly one JS function per register request.",
-                    result.single().get("message").asString(),
-                    "Global statement + Function must result in error message");
-        }
+        test(REGISTER_CALL, params, "message", "There must exist exactly one JS function per register request.", "Global statement + Function must result in error message");
     }
 
     @Test
@@ -86,12 +86,7 @@ public class StoredProcedureAPITests {
         Map<String, Object> params = new HashMap<>();
         params.put("script", script);
         params.put("name", "test");
-        try(Session session = driver.session()) {
-            Result result = session.run(REGISTER_CALL, params);
-            Assertions.assertEquals("There must be exactly one parameter in JS function.",
-                    result.single().get("message").asString(),
-                    "Function without variable must result in error message");
-        }
+        test(REGISTER_CALL, params, "message", "There must be exactly one parameter in JS function.", "Function without variable must result in error message");
     }
 
     @Test
@@ -106,12 +101,7 @@ public class StoredProcedureAPITests {
         Map<String, Object> params = new HashMap<>();
         params.put("script", script);
         params.put("name", "test");
-        try(Session session = driver.session()) {
-            Result result = session.run(REGISTER_CALL, params);
-            Assertions.assertEquals("There must be exactly one parameter in JS function.",
-                    result.single().get("message").asString(),
-                    "Function with multiple variables must result in error message");
-        }
+        test(REGISTER_CALL, params, "message", "There must be exactly one parameter in JS function.", "Function with multiple variables must result in error message");
     }
 
     @Test
@@ -127,12 +117,7 @@ public class StoredProcedureAPITests {
         Map<String, Object> params = new HashMap<>();
         params.put("script", script);
         params.put("name", "test");
-        try(Session session = driver.session()) {
-            Result result = session.run(REGISTER_CALL, params);
-            Assertions.assertEquals("Only predefined Java.type can be used in JS function.",
-                    result.single().get("message").asString(),
-                    "Java.type cannot be used in the function");
-        }
+        test(REGISTER_CALL, params, "message", "Only predefined Java.type can be used in JS function.",  "Java.type cannot be used in the function");
     }
 
     @Test
@@ -147,12 +132,7 @@ public class StoredProcedureAPITests {
         Map<String, Object> params = new HashMap<>();
         params.put("script", script);
         params.put("name", "countNodes");
-        try(Session session = driver.session()) {
-            Result result = session.run(REGISTER_CALL, params);
-            Assertions.assertEquals("Success",
-                    result.single().get("message").asString(),
-                    "Registration should be done");
-        }
+        test(REGISTER_CALL, params, "message", "Success",  "Registration should be done");
     }
 
     @Test
@@ -168,12 +148,7 @@ public class StoredProcedureAPITests {
         Map<String, Object> params = new HashMap<>();
         params.put("script", script);
         params.put("name", "createNode");
-        try(Session session = driver.session()) {
-            Result result = session.run(REGISTER_CALL, params);
-            Assertions.assertEquals("Success",
-                    result.single().get("message").asString(),
-                    "Registration should be done");
-        }
+        test(REGISTER_CALL, params, "message", "Success",  "Registration should be done");
     }
 
     @Test
@@ -183,12 +158,9 @@ public class StoredProcedureAPITests {
         Map<String, Object> procParams = new HashMap<>();
         params.put("name", "countMyNodes");
         params.put("params", procParams);
-        try(Session session = driver.session()) {
-            Result result = session.run(INVOKE_CALL, params);
-            Assertions.assertEquals("Procedure doesn't exist or cannot be loaded into ScriptEngine.",
-                    result.single().get("map").asMap().get("error"),
-                    "Non existing procedure must return error message");
-        }
+        Map<String, Object> expected = new HashMap<>();
+        expected.put("error","Procedure doesn't exist or cannot be loaded into ScriptEngine.");
+        test(INVOKE_CALL, params, "map", expected, "Non existing procedure must return error message");
     }
 
     @Test
@@ -198,12 +170,9 @@ public class StoredProcedureAPITests {
         Map<String, Object> procParams = new HashMap<>();
         params.put("name", "countNodes");
         params.put("params", procParams);
-        try(Session session = driver.session()) {
-            Result result = session.run(INVOKE_CALL, params);
-            Assertions.assertEquals(2L,
-                    result.single().get("map").asMap().get("result"),
-                    "Count must be 2 for two procedure nodes");
-        }
+        Map<String, Object> expected = new HashMap<>();
+        expected.put("result",2L);
+        test(INVOKE_CALL, params, "map", expected, "Count must be 2 for two procedure nodes");
     }
 
     @Test
@@ -215,11 +184,9 @@ public class StoredProcedureAPITests {
         procParams.put("id",111);
         params.put("name", "createNode");
         params.put("params", procParams);
-        try(Session session = driver.session()) {
-            Result result = session.run(INVOKE_CALL, params);
-            Assertions.assertNull(result.single().get("map").asMap().get("result"),
-                    "Function createNode doesn't return anything hence null");
-        }
+        Map<String, Object> expected = new HashMap<>();
+        expected.put("result",null);
+        test(INVOKE_CALL, params, "map", expected, "Function createNode doesn't return anything hence null");
     }
 
     @Test
@@ -229,12 +196,9 @@ public class StoredProcedureAPITests {
         Map<String, Object> procParams = new HashMap<>();
         params.put("name", "countNodes");
         params.put("params", procParams);
-        try(Session session = driver.session()) {
-            Result result = session.run(INVOKE_CALL, params);
-            Assertions.assertEquals(3L,
-                    result.single().get("map").asMap().get("result"),
-                    "Count must be 3 for two procedure + one Test nodes");
-        }
+        Map<String, Object> expected = new HashMap<>();
+        expected.put("result",3L);
+        test(INVOKE_CALL, params, "map", expected, "Count must be 3 for two procedure + one Test nodes");
     }
 
     @Test
@@ -249,12 +213,7 @@ public class StoredProcedureAPITests {
         Map<String, Object> params = new HashMap<>();
         params.put("script", script);
         params.put("name", "countNodes");
-        try(Session session = driver.session()) {
-            Result result = session.run(REGISTER_CALL, params);
-            Assertions.assertEquals("Success",
-                    result.single().get("message").asString(),
-                    "Registration should be done");
-        }
+        test(REGISTER_CALL, params, "message", "Success",  "Registration should be done");
     }
 
     @Test
@@ -265,11 +224,8 @@ public class StoredProcedureAPITests {
         procParams.put("label", "Test");
         params.put("name", "countNodes");
         params.put("params", procParams);
-        try(Session session = driver.session()) {
-            Result result = session.run(INVOKE_CALL, params);
-            Assertions.assertEquals(1L,
-                    result.single().get("map").asMap().get("result"),
-                    "Count must be 1 for one Test nodes");
-        }
+        Map<String, Object> expected = new HashMap<>();
+        expected.put("result",1L);
+        test(INVOKE_CALL, params, "map", expected, "Count must be 1 for one Test nodes");
     }
 }
