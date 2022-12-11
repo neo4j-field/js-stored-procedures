@@ -14,6 +14,7 @@ import java.util.Map;
 public class StoredProcedureEngine {
     public static Label JS_StoredProcedure = Label.label("JS_StoredProcedure");
     public static Label JS_RequiredClasses = Label.label("JS_RequiredClasses");
+    public static Label JS_FUNCTION = Label.label("JS_FUNCTION");
 
     private static  final ScriptEngineManager scriptFactory = new ScriptEngineManager();
     private static Map<String, ScriptEngine> dbScriptEngineMap = new HashMap<>();

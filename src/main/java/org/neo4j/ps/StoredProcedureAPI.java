@@ -34,8 +34,8 @@ public class StoredProcedureAPI {
     @Procedure(name = "js.procedure.register", mode = Mode.WRITE)
     @Description("js.procedure.register(<Valid Javascript Function Code>, <Public Name>, <Required Java Classes>) - Save a Javascript Stored Procedure")
     public Stream<RegisterResult> addNewJsProcedure(@Name(value = "script") String script,
-                                     @Name(value = "publicName" , defaultValue = "") String publicName,
-                                     @Name(value = "reqClasses", defaultValue = "") String reqClasses) throws RuntimeException {
+                                                    @Name(value = "publicName" , defaultValue = "") String publicName,
+                                                    @Name(value = "config", defaultValue = "{}") Map<String,Object> config) throws RuntimeException {
 
         Parser parser = Parser.create();
         JSParserDiagnosticListener listener = new JSParserDiagnosticListener() ;
@@ -83,7 +83,7 @@ public class StoredProcedureAPI {
     @Procedure(name = "js.procedure.invoke", mode = Mode.WRITE)
     @Description("js.procedure.invoke(<String procPublicName)>, {Proc Params}")
     public Stream<MapResult> invokeStoredProcedure(@Name("procedureName") String procedureName,
-                                               @Name(value = "parameters") Map parameters) {
+                                               @Name(value = "parameters") Map<String, Object> parameters) {
         Map<String, Object> result = new HashMap<>() ;
         ScriptDetails details = StoredProcedureEngine.getStoredProcedureEngine(null).getEngine(db, txn, procedureName);
 
