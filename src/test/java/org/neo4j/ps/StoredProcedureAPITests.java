@@ -200,9 +200,31 @@ public class StoredProcedureAPITests {
         expected.put("result",3L);
         test(INVOKE_CALL, params, "map", expected, "Count must be 3 for two procedure + one Test nodes");
     }
-
     @Test
     @Order(5)
+    public void testReRegisterSameReadProcedure() {
+        String script = "" +
+                "function nodeCount(params){" +
+                "   var log=params['log'];" +
+                "   var txn=params['txn'];" +
+                "   return txn.getAllNodes().stream().count();" +
+                "}";
+        Map<String, Object> params = new HashMap<>();
+        params.put("script", script);
+        params.put("name", "countNodes");
+        test(REGISTER_CALL, params, "message", "No Change",  "Registration should not be done again");
+
+        params = new HashMap<>();
+        Map<String, Object> procParams = new HashMap<>();
+        params.put("name", "countNodes");
+        params.put("params", procParams);
+        Map<String, Object> expected = new HashMap<>();
+        expected.put("result",3L);
+        test(INVOKE_CALL, params, "map", expected, "Count must still be 3 for two procedure + one Test nodes");
+    }
+
+    @Test
+    @Order(6)
     public void testReRegisterReadProcedure() {
         String script = "" +
                 "function nodeCount(params){" +
@@ -217,7 +239,7 @@ public class StoredProcedureAPITests {
     }
 
     @Test
-    @Order(6)
+    @Order(7)
     public void testInvokeReadProcedureAfterModification() {
         Map<String, Object> params = new HashMap<>();
         Map<String, Object> procParams = new HashMap<>();

@@ -24,6 +24,7 @@ public class StoredProcedureEngine {
     public static final String PublicName = "publicName";
     public static final String FunctionName = "name";
     public static final String Script = "script";
+    public static final String CheckSum = "checkSum";
 
     public static final String BasicDBClasses = "basicDBClasses";
     public static final String OtherClasses = "otherClasses";
@@ -124,7 +125,7 @@ public class StoredProcedureEngine {
 
         ScriptEngine engine = dbScriptEngineMap.get(dbName);
         details.setEngine(engine);
-        if( publicNameMap.get(procedureName) == null && !loadProcedure(db, tx, procedureName)) {
+        if(publicNameMap.get(procedureName) == null && !loadProcedure(db, tx, procedureName)) {
             //Procedure doesn't exist and cannot be loaded into ScriptEngine
             return null;
         }
@@ -136,8 +137,8 @@ public class StoredProcedureEngine {
     }
 
     public ValidationStatusCode validateFunction(String dbName, String publicName, String name) {
-        Map<String, Map<String, String>> publicNameMap = dbScriptPublicNameMap.get(dbName) ;
-        Map<String, Map<String, String>> nameMap = dbScriptNameMap.get(dbName) ;
+        Map<String, Map<String, String>> publicNameMap = dbScriptPublicNameMap.get(dbName);
+        Map<String, Map<String, String>> nameMap = dbScriptNameMap.get(dbName);
 
         if(publicNameMap == null || nameMap == null) {
             return ValidationStatusCode.NO_DATABASE_MATCH;
@@ -166,7 +167,7 @@ public class StoredProcedureEngine {
 
     public boolean loadProcedure(GraphDatabaseService db, Transaction tx, String publicName) {
         log.info("This class : " + this );
-        String dbName = db.databaseName() ;
+        String dbName = db.databaseName();
         ScriptEngine engine = dbScriptEngineMap.get(dbName);
         Map<String, Map<String, String>> publicNameMap = dbScriptPublicNameMap.get(dbName);
         Map<String, Map<String, String>> nameMap = dbScriptNameMap.get(dbName);

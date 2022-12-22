@@ -8,6 +8,10 @@ import org.neo4j.logging.Log;
 import org.neo4j.procedure.*;
 
 import javax.script.Invocable;
+import javax.xml.bind.DatatypeConverter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -22,24 +26,33 @@ public class StoredProcedureAPI {
     public GraphDatabaseService db;
 
     private static final Pattern JAVA_TYPE_REGEX = Pattern.compile("Java.type\\s*\\(\\s*['\"]([a-zA-Z_$][a-zA-Z\\d_$]*\\.?)+['\"]\\s*\\)");
+    private static final MessageDigest MESSAGE_DIGEST;
+
+    static {
+        try {
+            MESSAGE_DIGEST = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     /**
      *
      * @param script
      * @param publicName
-     * @param reqClasses
+     * @param config
      * @return
      * @throws RuntimeException
      */
     @Procedure(name = "js.procedure.register", mode = Mode.WRITE)
-    @Description("js.procedure.register(<Valid Javascript Function Code>, <Public Name>, <Required Java Classes>) - Save a Javascript Stored Procedure")
+    @Description("js.procedure.register(<Valid Javascript Function Code>, <Public Name>, <Config>) - Save a Javascript Stored Procedure")
     public Stream<RegisterResult> addNewJsProcedure(@Name(value = "script") String script,
                                                     @Name(value = "publicName" , defaultValue = "") String publicName,
                                                     @Name(value = "config", defaultValue = "{}") Map<String,Object> config) throws RuntimeException {
 
         Parser parser = Parser.create();
-        JSParserDiagnosticListener listener = new JSParserDiagnosticListener() ;
-        CompilationUnitTree cut = parser.parse(publicName, script, listener) ;
+        JSParserDiagnosticListener listener = new JSParserDiagnosticListener();
+        CompilationUnitTree cut = parser.parse(publicName, script, listener);
 
         if(listener.hasError()) {
             // There is some parse error.
@@ -57,15 +70,17 @@ public class StoredProcedureAPI {
             return Stream.of(new RegisterResult("Only predefined Java.type can be used in JS function."));
         }
         String name = ((FunctionDeclarationTree)(cut.getSourceElements().get(0))).getName().getName();
-
+        String checkSum = DatatypeConverter.printHexBinary(MESSAGE_DIGEST.digest(script.getBytes(StandardCharsets.UTF_8))).toUpperCase();
         if (validate(publicName, name)) {
             Node n = txn.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName);
             if(n == null) {
                 n = txn.createNode(StoredProcedureEngine.JS_StoredProcedure);
                 n.setProperty(StoredProcedureEngine.PublicName, publicName);
                 n.setProperty(StoredProcedureEngine.FunctionName, name);
-                n.setProperty(StoredProcedureEngine.Script, script);
+            } else if(String.valueOf(n.getProperty(StoredProcedureEngine.CheckSum)).equals(checkSum)) {
+                return Stream.of(RegisterResult.NO_CHANGE);
             }
+            n.setProperty(StoredProcedureEngine.CheckSum, checkSum);
             n.setProperty(StoredProcedureEngine.Script, script);
             StoredProcedureEngine.getStoredProcedureEngine(null).loadProcedure(db, txn, publicName);
             return Stream.of(RegisterResult.SUCCESS);
@@ -82,26 +97,25 @@ public class StoredProcedureAPI {
      */
     @Procedure(name = "js.procedure.invoke", mode = Mode.WRITE)
     @Description("js.procedure.invoke(<String procPublicName)>, {Proc Params}")
-    public Stream<MapResult> invokeStoredProcedure(@Name("procedureName") String procedureName,
-                                               @Name(value = "parameters") Map<String, Object> parameters) {
-        Map<String, Object> result = new HashMap<>() ;
+    public Stream<MapResult> invokeStoredProcedure(@Name("procedureName") String procedureName, @Name(value = "parameters") Map<String, Object> parameters) {
+        Map<String, Object> result = new HashMap<>();
         ScriptDetails details = StoredProcedureEngine.getStoredProcedureEngine(null).getEngine(db, txn, procedureName);
 
         if (details == null) {
-            result.put("error", "Procedure doesn't exist or cannot be loaded into ScriptEngine.") ;
+            result.put("error", "Procedure doesn't exist or cannot be loaded into ScriptEngine.");
         } else {
             if(parameters == null) {
-                parameters = new HashMap() ;
+                parameters = new HashMap();
             }
             parameters.put("txn", txn);
             parameters.put("log", log);
             try {
                 Invocable invocable = (Invocable) details.getEngine();
-                Object response = invocable.invokeFunction(details.getName(), parameters) ;
-                result.put("result", response) ;
+                Object response = invocable.invokeFunction(details.getName(), parameters);
+                result.put("result", response);
             } catch (Exception e) {
                 log.error("Something went wrong", e);
-                result.put("error", e.getMessage()) ;
+                result.put("error", e.getMessage());
             }
         }
         return Stream.of(new MapResult(result));

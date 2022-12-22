@@ -11,7 +11,7 @@ public class JSParserDiagnosticListener implements DiagnosticListener {
     @Override
     public void report(Diagnostic diagnostic) {
         if( diagnostic.getKind().name().equals("ERROR")) {
-            hasError = true ;
+            hasError = true;
         }
         message.append(diagnostic.getMessage());
     }
