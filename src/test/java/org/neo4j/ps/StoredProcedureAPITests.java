@@ -15,8 +15,9 @@ import java.util.Map;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class StoredProcedureAPITests {
 
-    private static final String REGISTER_CALL = "call js.procedure.register($script,$name, null)";
+    private static final String REGISTER_CALL = "call js.procedure.register($script, $name, null)";
     private static final String INVOKE_CALL = "call js.procedure.invoke($name, $params)";
+    private static final String UNREGISTER_CALL = "call js.procedure.unregister($name)";
 
     private Driver driver;
     private Neo4j embeddedDatabaseServer;
@@ -249,5 +250,34 @@ public class StoredProcedureAPITests {
         Map<String, Object> expected = new HashMap<>();
         expected.put("result",1L);
         test(INVOKE_CALL, params, "map", expected, "Count must be 1 for one Test nodes");
+    }
+
+    @Test
+    @Order(8)
+    public void testUnRegisterNonExistingReadProcedure() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("name", "calculateNodes");
+        test(UNREGISTER_CALL, params, "message", "Procedure 'calculateNodes' not found",  "Should return error message on non-existing procedure");
+    }
+
+    @Test
+    @Order(8)
+    public void testUnRegisterReadProcedure() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("name", "countNodes");
+        test(UNREGISTER_CALL, params, "message", "Success",  "UnRegistration should be done");
+    }
+
+    @Test
+    @Order(9)
+    public void testInvokeReadProcedureAfterUnregistration() {
+        Map<String, Object> params = new HashMap<>();
+        Map<String, Object> procParams = new HashMap<>();
+        procParams.put("label", "Test");
+        params.put("name", "countNodes");
+        params.put("params", procParams);
+        Map<String, Object> expected = new HashMap<>();
+        expected.put("error","ReferenceError: Cannot invoke unregistered procedure in <eval> at line number 1 at column number 27");
+        test(INVOKE_CALL, params, "map", expected, "Should return RuntimeException");
     }
 }

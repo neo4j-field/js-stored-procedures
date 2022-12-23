@@ -27,6 +27,7 @@ public class StoredProcedureAPI {
 
     private static final Pattern JAVA_TYPE_REGEX = Pattern.compile("Java.type\\s*\\(\\s*['\"]([a-zA-Z_$][a-zA-Z\\d_$]*\\.?)+['\"]\\s*\\)");
     private static final MessageDigest MESSAGE_DIGEST;
+    private static final String UNREGISTER_SCRIPT_TEMPLATE = "function %s(params){throw new ReferenceError('Cannot invoke unregistered procedure');}";
 
     static {
         try {
@@ -46,9 +47,9 @@ public class StoredProcedureAPI {
      */
     @Procedure(name = "js.procedure.register", mode = Mode.WRITE)
     @Description("js.procedure.register(<Valid Javascript Function Code>, <Public Name>, <Config>) - Save a Javascript Stored Procedure")
-    public Stream<RegisterResult> addNewJsProcedure(@Name(value = "script") String script,
+    public Stream<RegisterResult> registerStoredProcedure(@Name(value = "script") String script,
                                                     @Name(value = "publicName" , defaultValue = "") String publicName,
-                                                    @Name(value = "config", defaultValue = "{}") Map<String,Object> config) throws RuntimeException {
+                                                    @Name(value = "config", defaultValue = "{}") Map<String,Object> config) {
 
         Parser parser = Parser.create();
         JSParserDiagnosticListener listener = new JSParserDiagnosticListener();
@@ -86,6 +87,18 @@ public class StoredProcedureAPI {
             return Stream.of(RegisterResult.SUCCESS);
         } else {
             throw new RuntimeException("Proc Name not unique");
+        }
+    }
+
+    @Procedure(name = "js.procedure.unregister", mode = Mode.WRITE)
+    @Description("js.procedure.unregister(<Public Name>) - Unregister a Javascript Stored Procedure")
+    public Stream<RegisterResult> unregisterStoredProcedure(@Name(value = "publicName") String publicName) {
+
+        Node n = txn.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName);
+        if (n == null) {
+            return Stream.of(new RegisterResult("Procedure '"+publicName+"' not found"));
+        } else {
+            return registerStoredProcedure(String.format(UNREGISTER_SCRIPT_TEMPLATE, n.getProperty(StoredProcedureEngine.FunctionName)), publicName, null);
         }
     }
 
