@@ -1,4 +1,4 @@
-package org.neo4j.ps;
+package jsproc.neo4j;
 
 import jdk.nashorn.api.tree.CompilationUnitTree;
 import jdk.nashorn.api.tree.FunctionDeclarationTree;
@@ -73,17 +73,22 @@ public class StoredProcedureAPI {
         String name = ((FunctionDeclarationTree)(cut.getSourceElements().get(0))).getName().getName();
         String checkSum = DatatypeConverter.printHexBinary(MESSAGE_DIGEST.digest(script.getBytes(StandardCharsets.UTF_8))).toUpperCase();
         if (validate(publicName, name)) {
+            UpdatedStatus updatedStatus = UpdatedStatus.getInstance(db) ;
+            updatedStatus.updateTimestamp(txn, new Date());
             Node n = txn.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName);
             if(n == null) {
                 n = txn.createNode(StoredProcedureEngine.JS_StoredProcedure);
                 n.setProperty(StoredProcedureEngine.PublicName, publicName);
                 n.setProperty(StoredProcedureEngine.FunctionName, name);
+                n.setProperty(StoredProcedureEngine.LastUpdatedime, updatedStatus.getLastUpdated());
+                n.setProperty(StoredProcedureEngine.CheckSum, checkSum);
             } else if(String.valueOf(n.getProperty(StoredProcedureEngine.CheckSum)).equals(checkSum)) {
                 return Stream.of(RegisterResult.NO_CHANGE);
             }
             n.setProperty(StoredProcedureEngine.CheckSum, checkSum);
             n.setProperty(StoredProcedureEngine.Script, script);
-            StoredProcedureEngine.getStoredProcedureEngine(null).loadProcedure(db, txn, publicName);
+            n.setProperty(StoredProcedureEngine.LastUpdatedime, updatedStatus.getLastUpdated());
+            StoredProcedureEngine.getStoredProcedureEngine(null).loadProcedure(db, txn, publicName, updatedStatus);
             return Stream.of(RegisterResult.SUCCESS);
         } else {
             throw new RuntimeException("Proc Name not unique");

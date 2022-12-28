@@ -1,4 +1,4 @@
-package org.neo4j.ps;
+package jsproc.neo4j;
 
 public class RegisterResult {
 

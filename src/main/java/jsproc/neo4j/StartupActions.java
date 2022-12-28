@@ -1,4 +1,4 @@
-package org.neo4j.ps;
+package jsproc.neo4j;
 
 import org.neo4j.configuration.GraphDatabaseSettings;
 import org.neo4j.kernel.availability.AvailabilityGuard;

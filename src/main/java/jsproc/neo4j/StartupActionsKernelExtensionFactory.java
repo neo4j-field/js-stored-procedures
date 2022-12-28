@@ -1,4 +1,4 @@
-package org.neo4j.ps;
+package jsproc.neo4j;
 
 import org.neo4j.annotations.service.ServiceProvider;
 import org.neo4j.graphdb.GraphDatabaseService;

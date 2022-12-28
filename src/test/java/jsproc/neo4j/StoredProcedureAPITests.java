@@ -1,4 +1,4 @@
-package org.neo4j.ps;
+package jsproc.neo4j;
 
 import org.junit.jupiter.api.*;
 import org.neo4j.driver.Driver;

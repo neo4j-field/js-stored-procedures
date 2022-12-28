@@ -1,4 +1,4 @@
-package org.neo4j.ps;
+package jsproc.neo4j;
 
 import jdk.nashorn.api.tree.Diagnostic;
 import jdk.nashorn.api.tree.DiagnosticListener;
