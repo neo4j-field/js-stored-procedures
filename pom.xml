@@ -6,7 +6,7 @@
 
     <groupId>org.neo4j</groupId>
     <artifactId>js-stored-procs</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>4.4.0</version>
 
     <properties>
         <maven.compiler.source>15</maven.compiler.source>

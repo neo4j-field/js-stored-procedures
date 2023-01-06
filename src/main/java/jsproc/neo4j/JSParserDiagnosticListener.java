@@ -1,4 +1,4 @@
-package org.neo4j.ps;
+package jsproc.neo4j;
 
 import org.openjdk.nashorn.api.tree.Diagnostic;
 import org.openjdk.nashorn.api.tree.DiagnosticListener;
@@ -11,7 +11,7 @@ public class JSParserDiagnosticListener implements DiagnosticListener {
     @Override
     public void report(Diagnostic diagnostic) {
         if( diagnostic.getKind().name().equals("ERROR")) {
-            hasError = true ;
+            hasError = true;
         }
         message.append(diagnostic.getMessage());
     }

@@ -1,4 +1,4 @@
-package org.neo4j.ps;
+package jsproc.neo4j;
 
 import org.neo4j.graphdb.*;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
@@ -8,21 +8,30 @@ import org.neo4j.logging.Log;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
 public class StoredProcedureEngine {
     public static Label JS_StoredProcedure = Label.label("JS_StoredProcedure");
     public static Label JS_RequiredClasses = Label.label("JS_RequiredClasses");
+    public static Label JS_ProcedureLock = Label.label("JS_ProcedureLock");
+    public static Label JS_FUNCTION = Label.label("JS_FUNCTION");
 
     private static  final ScriptEngineManager scriptFactory = new ScriptEngineManager();
     private static Map<String, ScriptEngine> dbScriptEngineMap = new HashMap<>();
-    private static Map<String, Map<String, Map<String, String>>> dbScriptPublicNameMap = new HashMap<>();
-    private static Map<String, Map<String, Map<String, String>>> dbScriptNameMap = new HashMap<>();
+    private static Map<String, Map<String, ScriptStatus>> dbScriptPublicNameMap = new HashMap<>();
+    private static Map<String, Map<String, ScriptStatus>> dbScriptNameMap = new HashMap<>();
+    private static Map<String, ZonedDateTime> dbScriptLastUpdate = new HashMap<>();
 
     public static final String PublicName = "publicName";
     public static final String FunctionName = "name";
     public static final String Script = "script";
+    public static final String CheckSum = "checkSum";
+    public static final String LastReadTime = "lastReadTime";
+    public static final String LastUpdatedime = "lastUpdatedTime";
+    public static final String LoadOnStartup = "loadOnStartup";
+    public static final String LoadInterval = "loadInterval";
 
     public static final String BasicDBClasses = "basicDBClasses";
     public static final String OtherClasses = "otherClasses";
@@ -102,13 +111,13 @@ public class StoredProcedureEngine {
             }
 
             ResourceIterator<Node> procNodes = tx.findNodes(JS_StoredProcedure);
-            Map<String, Map<String, String>> publicNameMap = new HashMap<>();
-            Map<String, Map<String, String>> nameMap = new HashMap<>();
+            Map<String, ScriptStatus> publicNameMap = new HashMap<>();
+            Map<String, ScriptStatus> nameMap = new HashMap<>();
             dbScriptPublicNameMap.put(dbName, publicNameMap);
             dbScriptNameMap.put(dbName, nameMap);
             procNodes.stream().forEach(n -> {
                 try {
-                    loadScriptIntoEngine(engine, publicNameMap, nameMap, n);
+                    loadScriptIntoEngine(engine, publicNameMap, nameMap, n, false);
                 } catch(ScriptException e) {
                     log.error("Could not load stored JS Script due to eval error. See message", e);
                 }
@@ -118,32 +127,40 @@ public class StoredProcedureEngine {
 
     public ScriptDetails getEngine(GraphDatabaseService db, Transaction tx, String procedureName) {
         String dbName = db.databaseName();
+        Map<String, ScriptStatus> publicNameMap = dbScriptPublicNameMap.get(dbName);
+        ScriptStatus data = publicNameMap.get(procedureName);
+
+        if( (data != null && data.disabled) ) {
+            // Procedure is disabled.
+            return null;
+        }
+
         ScriptDetails details = new ScriptDetails();
-        Map<String, Map<String, String>> publicNameMap = dbScriptPublicNameMap.get(dbName);
+        UpdatedStatus updatedStatus = UpdatedStatus.getInstance(db) ;
 
         ScriptEngine engine = dbScriptEngineMap.get(dbName);
         details.setEngine(engine);
-        if( publicNameMap.get(procedureName) == null && !loadProcedure(db, tx, procedureName)) {
+        if( ( data == null || updatedStatus.getLastUpdated().isAfter(data.lastReadTime) )
+                && !loadProcedure(db, tx, procedureName, updatedStatus)) {
             //Procedure doesn't exist and cannot be loaded into ScriptEngine
             return null;
         }
 
-        Map<String, String> data = publicNameMap.get(procedureName);
-        details.setName(data.get(FunctionName));
+        details.setName(data.functionName);
         details.setPublicName(procedureName);
         return details;
     }
 
     public ValidationStatusCode validateFunction(String dbName, String publicName, String name) {
-        Map<String, Map<String, String>> publicNameMap = dbScriptPublicNameMap.get(dbName) ;
-        Map<String, Map<String, String>> nameMap = dbScriptNameMap.get(dbName) ;
+        Map<String, ScriptStatus> publicNameMap = dbScriptPublicNameMap.get(dbName);
+        Map<String, ScriptStatus> nameMap = dbScriptNameMap.get(dbName);
 
         if(publicNameMap == null || nameMap == null) {
             return ValidationStatusCode.NO_DATABASE_MATCH;
         }
 
-        Map<String, String> savedPublicNameMap = nameMap.get(name);
-        Map<String, String> savedNameMap = publicNameMap.get(publicName);
+        ScriptStatus savedPublicNameMap = nameMap.get(name);
+        ScriptStatus savedNameMap = publicNameMap.get(publicName);
 
         if(savedPublicNameMap == null) {
             return ValidationStatusCode.PUBLIC_NAME_MISSING;
@@ -153,8 +170,8 @@ public class StoredProcedureEngine {
             return ValidationStatusCode.NAME_MISSING;
         }
 
-        String savedName = savedPublicNameMap.get(FunctionName);
-        String savedPublicName = savedNameMap.get(PublicName);
+        String savedName = savedPublicNameMap.functionName;
+        String savedPublicName = savedNameMap.publicName;
 
         if(!(savedName.equals(name) && savedPublicName.equals(publicName))) {
             return ValidationStatusCode.NAMES_MISMATCH;
@@ -163,17 +180,21 @@ public class StoredProcedureEngine {
         return ValidationStatusCode.SUCCESS;
     }
 
-    public boolean loadProcedure(GraphDatabaseService db, Transaction tx, String publicName) {
+    public boolean loadProcedure(GraphDatabaseService db, Transaction tx, String publicName, UpdatedStatus updatedStatus) {
         log.info("This class : " + this );
-        String dbName = db.databaseName() ;
+        String dbName = db.databaseName();
         ScriptEngine engine = dbScriptEngineMap.get(dbName);
-        Map<String, Map<String, String>> publicNameMap = dbScriptPublicNameMap.get(dbName);
-        Map<String, Map<String, String>> nameMap = dbScriptNameMap.get(dbName);
+        Map<String, ScriptStatus> publicNameMap = dbScriptPublicNameMap.get(dbName);
+        Map<String, ScriptStatus> nameMap = dbScriptNameMap.get(dbName);
+        ScriptStatus data = publicNameMap.get(publicName);
 
         Node n = tx.findNode(JS_StoredProcedure, PublicName, publicName);
         try {
             if (n != null) {
-                loadScriptIntoEngine(engine, publicNameMap, nameMap, n);
+                ZonedDateTime lastUpdated = (ZonedDateTime) n.getProperty(LastUpdatedime);
+                if( data == null || lastUpdated.isBefore(data.lastReadTime) ) {
+                    loadScriptIntoEngine(engine, publicNameMap, nameMap, n, true);
+                }
                 return true;
             }
         } catch(ScriptException e) {
@@ -182,18 +203,45 @@ public class StoredProcedureEngine {
         return false;
     }
 
-    private void loadScriptIntoEngine(ScriptEngine engine, Map<String, Map<String, String>> publicNameMap, Map<String, Map<String, String>> nameMap, Node n) throws ScriptException {
+    private void loadScriptIntoEngine(
+            ScriptEngine engine,
+            Map<String, ScriptStatus> publicNameMap,
+            Map<String, ScriptStatus> nameMap,
+            Node n,
+            boolean forceLoad) throws ScriptException {
         String pubName = n.getProperty(PublicName).toString();
         String script = n.getProperty(Script).toString();
         String name = n.getProperty(FunctionName).toString();
+        boolean loaded = true ;
+
+        if( !forceLoad ) {
+            Object temp = n.getProperty(LoadOnStartup, null);
+            try {
+                if (temp != null) {
+                    loaded = ((Boolean) temp).booleanValue();
+                }
+            } catch (Exception e) {
+            }
+        }
+
         log.debug(String.format("Loading script: %s from DB", name));
 
-        engine.eval(script);
-        Map<String, String> data = new HashMap<>();
-        data.put(FunctionName, name);
-        data.put(PublicName, pubName);
-        publicNameMap.put(pubName, data);
-        nameMap.put(name, data);
+        ScriptStatus data = publicNameMap.get(pubName);
+        if( data == null ) {
+            data = new ScriptStatus() ;
+            data.functionName = name;
+            data.publicName = pubName;
+
+            publicNameMap.put(pubName, data);
+            nameMap.put(name, data);
+        }
+
+        data.loaded = loaded ;
+        data.lastReadTime = ZonedDateTime.now() ;
+
+        if( loaded ) {
+            engine.eval(script);
+        }
     }
 
 }
