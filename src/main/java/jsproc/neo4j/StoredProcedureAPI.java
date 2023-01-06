@@ -12,6 +12,7 @@ import javax.xml.bind.DatatypeConverter;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -74,7 +75,7 @@ public class StoredProcedureAPI {
         String checkSum = DatatypeConverter.printHexBinary(MESSAGE_DIGEST.digest(script.getBytes(StandardCharsets.UTF_8))).toUpperCase();
         if (validate(publicName, name)) {
             UpdatedStatus updatedStatus = UpdatedStatus.getInstance(db) ;
-            updatedStatus.updateTimestamp(txn, new Date());
+            updatedStatus.updateTimestamp(txn, ZonedDateTime.now());
             Node n = txn.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName);
             if(n == null) {
                 n = txn.createNode(StoredProcedureEngine.JS_StoredProcedure);

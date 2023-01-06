@@ -8,7 +8,7 @@ import org.neo4j.logging.Log;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
-import java.util.Date;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,7 +22,7 @@ public class StoredProcedureEngine {
     private static Map<String, ScriptEngine> dbScriptEngineMap = new HashMap<>();
     private static Map<String, Map<String, ScriptStatus>> dbScriptPublicNameMap = new HashMap<>();
     private static Map<String, Map<String, ScriptStatus>> dbScriptNameMap = new HashMap<>();
-    private static Map<String, Date> dbScriptLastUpdate = new HashMap<>();
+    private static Map<String, ZonedDateTime> dbScriptLastUpdate = new HashMap<>();
 
     public static final String PublicName = "publicName";
     public static final String FunctionName = "name";
@@ -127,15 +127,21 @@ public class StoredProcedureEngine {
 
     public ScriptDetails getEngine(GraphDatabaseService db, Transaction tx, String procedureName) {
         String dbName = db.databaseName();
-        ScriptDetails details = new ScriptDetails();
         Map<String, ScriptStatus> publicNameMap = dbScriptPublicNameMap.get(dbName);
         ScriptStatus data = publicNameMap.get(procedureName);
 
+        if( (data != null && data.disabled) ) {
+            // Procedure is disabled.
+            return null;
+        }
+
+        ScriptDetails details = new ScriptDetails();
         UpdatedStatus updatedStatus = UpdatedStatus.getInstance(db) ;
 
         ScriptEngine engine = dbScriptEngineMap.get(dbName);
         details.setEngine(engine);
-        if( ( data == null || updatedStatus.getLastUpdated().getTime() > data.lastReadTime.getTime() ) && (data != null && !data.disabled) && !loadProcedure(db, tx, procedureName, updatedStatus)) {
+        if( ( data == null || updatedStatus.getLastUpdated().isAfter(data.lastReadTime) )
+                && !loadProcedure(db, tx, procedureName, updatedStatus)) {
             //Procedure doesn't exist and cannot be loaded into ScriptEngine
             return null;
         }
@@ -185,11 +191,10 @@ public class StoredProcedureEngine {
         Node n = tx.findNode(JS_StoredProcedure, PublicName, publicName);
         try {
             if (n != null) {
-                Date lastUpdated = (Date) n.getProperty(LastUpdatedime);
-                if( lastUpdated.getTime() > updatedStatus.getLastUpdated().getTime()) {
+                ZonedDateTime lastUpdated = (ZonedDateTime) n.getProperty(LastUpdatedime);
+                if( data == null || lastUpdated.isBefore(data.lastReadTime) ) {
                     loadScriptIntoEngine(engine, publicNameMap, nameMap, n, true);
                 }
-                data.lastReadTime = new Date() ;
                 return true;
             }
         } catch(ScriptException e) {
@@ -232,7 +237,7 @@ public class StoredProcedureEngine {
         }
 
         data.loaded = loaded ;
-        data.lastReadTime = new Date() ;
+        data.lastReadTime = ZonedDateTime.now() ;
 
         if( loaded ) {
             engine.eval(script);

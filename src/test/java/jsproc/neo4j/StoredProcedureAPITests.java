@@ -172,8 +172,8 @@ public class StoredProcedureAPITests {
         params.put("name", "countNodes");
         params.put("params", procParams);
         Map<String, Object> expected = new HashMap<>();
-        expected.put("result",2L);
-        test(INVOKE_CALL, params, "map", expected, "Count must be 2 for two procedure nodes");
+        expected.put("result",3L);
+        test(INVOKE_CALL, params, "map", expected, "Count must be 3 for two procedure nodes");
     }
 
     @Test
@@ -198,8 +198,8 @@ public class StoredProcedureAPITests {
         params.put("name", "countNodes");
         params.put("params", procParams);
         Map<String, Object> expected = new HashMap<>();
-        expected.put("result",3L);
-        test(INVOKE_CALL, params, "map", expected, "Count must be 3 for two procedure + one Test nodes");
+        expected.put("result",4L);
+        test(INVOKE_CALL, params, "map", expected, "Count must be 4 for two procedure + one Test nodes");
     }
     @Test
     @Order(5)
@@ -220,8 +220,8 @@ public class StoredProcedureAPITests {
         params.put("name", "countNodes");
         params.put("params", procParams);
         Map<String, Object> expected = new HashMap<>();
-        expected.put("result",3L);
-        test(INVOKE_CALL, params, "map", expected, "Count must still be 3 for two procedure + one Test nodes");
+        expected.put("result",4L);
+        test(INVOKE_CALL, params, "map", expected, "Count must still be 4 for two procedure + one Test nodes");
     }
 
     @Test

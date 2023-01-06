@@ -1,11 +1,11 @@
 package jsproc.neo4j;
 
-import java.util.Date;
+import java.time.ZonedDateTime;
 
 public class ScriptStatus {
     public String publicName ;
     public String functionName ;
-    public Date lastReadTime ;
+    public ZonedDateTime lastReadTime ;
     public boolean loaded = false ;
     public boolean disabled = false ;
 }

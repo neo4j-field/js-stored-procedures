@@ -5,7 +5,7 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.graphdb.Transaction;
 
-import java.util.Date;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -13,8 +13,8 @@ public class UpdatedStatus {
 
     private static Map<String, UpdatedStatus> statusMap = new HashMap<>() ;;
 
-    private Date lastUpdated ;
-    private Date lastRead ;
+    private ZonedDateTime lastUpdated ;
+    private ZonedDateTime lastRead ;
     private long interval = 3600 ;
     private long nodeId = -1 ;
 
@@ -32,7 +32,7 @@ public class UpdatedStatus {
     }
 
     private void updateStatus(GraphDatabaseService db) {
-        if( lastUpdated == null || lastRead == null || ( new Date().getTime() - lastRead.getTime() ) > interval ) {
+        if( lastUpdated == null || lastRead == null || ( ZonedDateTime.now().toEpochSecond() - lastRead.toEpochSecond() ) > interval ) {
             refreshUpdateStatus(db) ;
         }
     }
@@ -40,19 +40,19 @@ public class UpdatedStatus {
     private UpdatedStatus() {
     }
 
-    public Date getLastUpdated() {
+    public ZonedDateTime getLastUpdated() {
         return lastUpdated;
     }
 
-    public void setLastUpdated(Date lastUpdated) {
+    public void setLastUpdated(ZonedDateTime lastUpdated) {
         this.lastUpdated = lastUpdated;
     }
 
-    public Date getLastRead() {
+    public ZonedDateTime getLastRead() {
         return lastRead;
     }
 
-    public void setLastRead(Date lastRead) {
+    public void setLastRead(ZonedDateTime lastRead) {
         this.lastRead = lastRead;
     }
 
@@ -75,7 +75,7 @@ public class UpdatedStatus {
                 node = nodes.next();
             } else {
                 node = tx.createNode(StoredProcedureEngine.JS_ProcedureLock) ;
-                node.setProperty(StoredProcedureEngine.LastUpdatedime, new Date());
+                node.setProperty(StoredProcedureEngine.LastUpdatedime, ZonedDateTime.now());
             }
             nodeId = node.getId() ;
         } else {
@@ -88,14 +88,14 @@ public class UpdatedStatus {
             interval = 3600; // Refresh every hour
         }
         o = node.getProperty(StoredProcedureEngine.LastUpdatedime, null ) ;
-        lastUpdated = (Date)o;
-        lastRead = new Date();
+        lastUpdated = (ZonedDateTime)o;
+        lastRead = ZonedDateTime.now();
 
         tx.commit();
     }
 
-    public void updateTimestamp(Transaction tx, Date date) {
+    public void updateTimestamp(Transaction tx, ZonedDateTime date) {
         Node node = tx.getNodeById(nodeId) ;
-        node.setProperty(StoredProcedureEngine.LastUpdatedime, new Date());
+        node.setProperty(StoredProcedureEngine.LastUpdatedime, date);
     }
 }

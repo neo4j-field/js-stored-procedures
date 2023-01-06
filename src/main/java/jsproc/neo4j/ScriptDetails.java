@@ -1,7 +1,6 @@
 package jsproc.neo4j;
 
 import javax.script.ScriptEngine;
-import java.util.Date;
 
 public class ScriptDetails {
 
