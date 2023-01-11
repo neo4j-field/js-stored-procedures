@@ -1,10 +1,14 @@
 package jsproc.neo4j;
 
+import com.oracle.truffle.js.scriptengine.GraalJSScriptEngine;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.HostAccess;
 import org.neo4j.graphdb.*;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.logging.Log;
 
 
+import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
@@ -72,7 +76,20 @@ public class StoredProcedureEngine {
 
     public void loadStoredProcedures(GraphDatabaseAPI db) {
         String dbName = db.databaseName();
-        ScriptEngine engine = scriptFactory.getEngineByName("nashorn");
+        //ScriptEngine engine = scriptFactory.getEngineByName("graal.js");
+        ScriptEngine engine = GraalJSScriptEngine.create(null,
+                Context.newBuilder("js")
+                        .allowHostAccess(HostAccess.ALL)
+                        .allowHostClassLookup(s -> true)
+                        .option("js.ecmascript-version", "2021"));
+
+//        ScriptEngine eng = GraalJSScriptEngine.create(null,
+//                Context.newBuilder("js")
+//                        .allowHostAccess(HostAccess.ALL)
+//                        .allowHostClassLookup(s -> true)
+//                        .option("js.ecmascript-version", "2021"));
+//        System.out.println(eng) ;
+        System.out.println(scriptFactory.getEngineFactories());
 
         log.info("Loading Stored procedures for Database : " + dbName);
         log.info("This class : " + this);

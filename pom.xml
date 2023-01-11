@@ -16,6 +16,7 @@
         <neo4j-java-driver.version>5.2.0</neo4j-java-driver.version>
         <junit-jupiter.version>5.8.2</junit-jupiter.version>
         <assertj.version>3.22.0</assertj.version>
+        <graalvm.version>22.3.0</graalvm.version>
     </properties>
 
 
@@ -30,6 +31,21 @@
             <artifactId>neo4j</artifactId>
             <version>${neo4j.version}</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.graalvm.sdk</groupId>
+            <artifactId>graal-sdk</artifactId>
+            <version>${graalvm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.graalvm.js</groupId>
+            <artifactId>js</artifactId>
+            <version>${graalvm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.graalvm.js</groupId>
+            <artifactId>js-scriptengine</artifactId>
+            <version>${graalvm.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjdk.nashorn</groupId>

@@ -277,7 +277,7 @@ public class StoredProcedureAPITests {
         params.put("name", "countNodes");
         params.put("params", procParams);
         Map<String, Object> expected = new HashMap<>();
-        expected.put("error","ReferenceError: Cannot invoke unregistered procedure in <eval> at line number 1 at column number 27");
+        expected.put("error","org.graalvm.polyglot.PolyglotException: ReferenceError: Cannot invoke unregistered procedure");
         test(INVOKE_CALL, params, "map", expected, "Should return RuntimeException");
     }
 }
