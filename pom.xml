@@ -9,8 +9,8 @@
     <version>5.2.0</version>
 
     <properties>
-        <maven.compiler.source>15</maven.compiler.source>
-        <maven.compiler.target>15</maven.compiler.target>
+        <java.version>17</java.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
         <nashorn.version>15.4</nashorn.version>
         <neo4j.version>5.2.0</neo4j.version>
         <neo4j-java-driver.version>5.2.0</neo4j-java-driver.version>
