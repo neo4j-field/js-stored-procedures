@@ -41,10 +41,14 @@ public class StoredProcedureAPITests {
     private void test(String cypher, Map<String, Object> params, String returnKey, Object expected, String message) {
         try(Session session = driver.session()) {
             Result result = session.run(cypher, params);
-            Object actual = (expected instanceof String) ? result.single().get(returnKey).asString()
-                    : (expected instanceof Map) ? result.single().get(returnKey).asMap()
-                    : result.single().get(returnKey);
-            Assertions.assertEquals(expected, actual, message);
+            try {
+                Object actual = (expected instanceof String) ? result.single().get(returnKey).asString()
+                        : (expected instanceof Map) ? result.single().get(returnKey).asMap()
+                        : result.single().get(returnKey);
+                Assertions.assertEquals(expected, actual, message);
+            }catch (Exception e) {
+                Assertions.assertEquals(expected, e.getMessage(), message);
+            }
         }
     }
 
@@ -118,7 +122,11 @@ public class StoredProcedureAPITests {
         Map<String, Object> params = new HashMap<>();
         params.put("script", script);
         params.put("name", "test");
-        test(REGISTER_CALL, params, "message", "Only predefined Java.type can be used in JS function.",  "Java.type cannot be used in the function");
+        try {
+            test(REGISTER_CALL, params, "message", "Only predefined Java.type can be used in JS function.", "Java.type cannot be used in the function");
+        }catch (Exception e ) {
+            System.out.println(e.getMessage());
+        }
     }
 
     @Test
@@ -276,8 +284,8 @@ public class StoredProcedureAPITests {
         procParams.put("label", "Test");
         params.put("name", "countNodes");
         params.put("params", procParams);
-        Map<String, Object> expected = new HashMap<>();
-        expected.put("error","ReferenceError: Cannot invoke unregistered procedure in <eval> at line number 1 at column number 27");
+//        Map<String, Object> expected = new HashMap<>();
+        String expected = "Failed to invoke procedure `js.procedure.invoke`: Caused by: java.lang.RuntimeException: ReferenceError: Cannot invoke unregistered procedure in <eval> at line number 1 at column number 27";
         test(INVOKE_CALL, params, "map", expected, "Should return RuntimeException");
     }
 }

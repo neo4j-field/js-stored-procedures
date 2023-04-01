@@ -92,7 +92,57 @@ public class StoredProcedureAPI {
             StoredProcedureEngine.getStoredProcedureEngine(null).loadProcedure(db, txn, publicName, updatedStatus);
             return Stream.of(RegisterResult.SUCCESS);
         } else {
-            throw new RuntimeException("Proc Name not unique");
+            throw new RuntimeException("Procedure Name not unique");
+        }
+    }
+
+    @Procedure(name = "js.function.register", mode = Mode.WRITE)
+    @Description("js.function.register(<Valid Javascript Function Code>, <Public Name>, <Config>) - Save a Javascript Stored Procedure")
+    public Stream<RegisterResult> registerFunction(@Name(value = "script") String script,
+                                                          @Name(value = "publicName" , defaultValue = "") String publicName,
+                                                          @Name(value = "config", defaultValue = "{}") Map<String,Object> config) {
+
+        Parser parser = Parser.create();
+        JSParserDiagnosticListener listener = new JSParserDiagnosticListener();
+        CompilationUnitTree cut = parser.parse(publicName, script, listener);
+
+        if(listener.hasError()) {
+            // There is some parse error.
+            return Stream.of(new RegisterResult(listener.getMessage()));
+        }
+
+        if(cut.getSourceElements().size() != 1 || !(cut.getSourceElements().get(0) instanceof FunctionDeclarationTree)) {
+            // Error
+            return Stream.of(new RegisterResult("There must exist exactly one JS function per register request."));
+        } else if (((FunctionDeclarationTree)(cut.getSourceElements().get(0))).getParameters().size() != 1) {
+            // Error
+            return Stream.of(new RegisterResult("There must be exactly one parameter in JS function."));
+        } else if(JAVA_TYPE_REGEX.matcher(script).find()) {
+            // Error
+            return Stream.of(new RegisterResult("Only predefined Java.type can be used in JS function."));
+        }
+        String name = ((FunctionDeclarationTree)(cut.getSourceElements().get(0))).getName().getName();
+        String checkSum = DatatypeConverter.printHexBinary(MESSAGE_DIGEST.digest(script.getBytes(StandardCharsets.UTF_8))).toUpperCase();
+        if (validate(publicName, name)) {
+            UpdatedStatus updatedStatus = UpdatedStatus.getInstance(db) ;
+            updatedStatus.updateTimestamp(txn, ZonedDateTime.now());
+            Node n = txn.findNode(StoredProcedureEngine.JS_FUNCTION, StoredProcedureEngine.PublicName, publicName);
+            if(n == null) {
+                n = txn.createNode(StoredProcedureEngine.JS_FUNCTION);
+                n.setProperty(StoredProcedureEngine.PublicName, publicName);
+                n.setProperty(StoredProcedureEngine.FunctionName, name);
+                n.setProperty(StoredProcedureEngine.LastUpdatedime, updatedStatus.getLastUpdated());
+                n.setProperty(StoredProcedureEngine.CheckSum, checkSum);
+            } else if(String.valueOf(n.getProperty(StoredProcedureEngine.CheckSum)).equals(checkSum)) {
+                return Stream.of(RegisterResult.NO_CHANGE);
+            }
+            n.setProperty(StoredProcedureEngine.CheckSum, checkSum);
+            n.setProperty(StoredProcedureEngine.Script, script);
+            n.setProperty(StoredProcedureEngine.LastUpdatedime, updatedStatus.getLastUpdated());
+            StoredProcedureEngine.getStoredProcedureEngine(null).loadProcedure(db, txn, publicName, updatedStatus);
+            return Stream.of(RegisterResult.SUCCESS);
+        } else {
+            throw new RuntimeException("Function Name not unique");
         }
     }
 
@@ -134,6 +184,33 @@ public class StoredProcedureAPI {
                 result.put("result", response);
             } catch (Exception e) {
                 log.error("Something went wrong", e);
+//                result.put("error", e.getMessage());
+                throw new RuntimeException(e.getMessage()) ;
+            }
+        }
+        return Stream.of(new MapResult(result));
+    }
+
+    @Procedure(name = "js.function.invoke", mode = Mode.READ)
+    @Description("js.function.invoke(<String functionPublicName)>, {Function Params}")
+    public Stream<MapResult> invokeFunction(@Name("functionName") String functionName, @Name(value = "parameters") Map<String, Object> parameters) {
+        Map<String, Object> result = new HashMap<>();
+        ScriptDetails details = StoredProcedureEngine.getStoredProcedureEngine(null).getEngine(db, txn, functionName);
+
+        if (details == null) {
+            result.put("error", "Procedure doesn't exist or cannot be loaded into ScriptEngine.");
+        } else {
+            if(parameters == null) {
+                parameters = new HashMap();
+            }
+            parameters.put("txn", txn);
+            parameters.put("log", log);
+            try {
+                Invocable invocable = (Invocable) details.getEngine();
+                Object response = invocable.invokeFunction(details.getName(), parameters);
+                result.put("result", response);
+            } catch (Exception e) {
+                log.error("Something went wrong", e);
                 result.put("error", e.getMessage());
             }
         }
@@ -145,6 +222,14 @@ public class StoredProcedureAPI {
         if(status == ValidationStatusCode.NAME_MISSING || status == ValidationStatusCode.PUBLIC_NAME_MISSING) {
             Node n = txn.findNode(StoredProcedureEngine.JS_StoredProcedure, StoredProcedureEngine.PublicName, publicName);
             if (n != null) {
+                // We already have a function with this public name.
+                if(status == ValidationStatusCode.NAME_MISSING) {
+                    // Since we couldn't find the name, but found the public name
+                    // There is a mismatch.
+                    return false;
+                }
+            } else {
+                n = txn.findNode(StoredProcedureEngine.JS_FUNCTION, StoredProcedureEngine.PublicName, publicName);
                 // We already have a function with this public name.
                 if(status == ValidationStatusCode.NAME_MISSING) {
                     // Since we couldn't find the name, but found the public name
