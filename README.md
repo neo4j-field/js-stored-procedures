@@ -49,7 +49,7 @@ On successful execution this will return a Map with the results from the Javascr
 ## Example
 In cypher-shell or neo4j browser, execute:
 
-``CALL js.procedure.register('function myTest() {log.info(\'Hello neo4j\');}', "myTest")``
+``CALL js.procedure.register("function myTest(params) {var log = params['log']; log.info('Hello neo4j');}", "myTest", {})``
 
 Validate your DB objects by running:
 
@@ -63,7 +63,7 @@ Finally, inspect your debug.log to see the "Hello World" message.
 
 Another example: 
 
-``CALL js.procedure.register("function nodeCount(params) { var log = params['log'] ; var txn = params['txn'] ; log.info('Testing log') ;  return txn.getAllNodes().stream().count() }", "nodecount", "")``
+``CALL js.procedure.register("function nodeCount(params) { var log = params['log'] ; var txn = params['txn'] ; log.info('Testing log') ;  return txn.getAllNodes().stream().count() }", "nodecount", {})``
 
 Run this procedure next
 
